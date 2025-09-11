@@ -10,7 +10,8 @@ import torch.nn as nn
 
 from tqdm import tqdm, trange
 from sklearn.metrics import precision_score, recall_score
-from transformers.optimization import AdamW, get_linear_schedule_with_warmup
+from torch.optim import AdamW
+from transformers import get_linear_schedule_with_warmup
 from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
 
 warnings.filterwarnings('ignore')
