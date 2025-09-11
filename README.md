@@ -1,1 +1,1 @@
-# seq_xgpt
+# SeqXGPT
