@@ -235,7 +235,8 @@ class SupervisedTrainer:
         """most_common_tag is a tuple: (tag, times)"""
         from collections import Counter
 
-        tags = [self.id2label[tag] for tag in tags]
+        '''tags = [self.id2label[tag] for tag in tags]'''
+        tags = [self.id2label[tag] for tag in tags if tag != -1]
         tags = [tag.split('-')[-1] for tag in tags]
         tag_counts = Counter(tags)
         most_common_tag = tag_counts.most_common(1)[0]
