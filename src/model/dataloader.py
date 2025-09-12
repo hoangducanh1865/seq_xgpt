@@ -31,6 +31,8 @@ class DataManager:
         self.label2id = {v: k for k, v in id2label.items()}
         self.word_pad_idx = word_pad_idx
         self.label_pad_idx = label_pad_idx
+        self.train_dataloader = None
+        self.test_dataloader = None
 
         data = dict()
 
