@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from typing import List, Tuple
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from transformers.models.bert import BertModel
+from transformers.models.bert.modeling_bert import BertModel
 from fastNLP.modules.torch import MLP,ConditionalRandomField,allowed_transitions
 from torch.nn import CrossEntropyLoss
 
