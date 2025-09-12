@@ -12,6 +12,7 @@ from sklearn.preprocessing import normalize
 from tqdm import tqdm
 
 
+'''
 def access_api(text, api_url, do_generate=False):
     """
 
@@ -33,6 +34,35 @@ def access_api(text, api_url, do_generate=False):
     else:
         content = None
     return content
+'''
+def access_api(text, api_url, do_generate=False):
+    """
+    :param text: input text
+    :param api_url: api
+    :param do_generate: whether generate or not
+    :return:
+    """
+    try:
+        with httpx.Client(timeout=60) as client:
+            post_data = {
+                "text": text,
+                "do_generate": do_generate,
+            }
+            
+            # Gửi msgpack data như server expect
+            packed_data = msgpack.packb(post_data)
+            prediction = client.post(api_url, data=packed_data, timeout=60)
+            
+            if prediction.status_code == 200:
+                content = msgpack.unpackb(prediction.content)
+                return content
+            else:
+                print(f"API Error {prediction.status_code}: {prediction.text[:100]}")
+                return None
+                
+    except Exception as e:
+        print(f"Request failed: {e}")
+        return None
 
 
 def get_features(type, input_file, output_file):
@@ -42,7 +72,8 @@ def get_features(type, input_file, output_file):
 
     en_model_names = ['gpt_2', 'gpt_neo', 'gpt_J', 'llama']
     cn_model_names = ['wenzhong', 'sky_text', 'damo', 'chatglm']
-
+    
+    '''
     gpt_2_api = 'http://10.176.52.120:20098/inference'
     gpt_neo_api = 'http://10.176.52.120:20097/inference'
     gpt_J_api = 'http://10.176.52.120:20099/inference'
@@ -51,9 +82,16 @@ def get_features(type, input_file, output_file):
     sky_text_api = 'http://10.176.52.120:20102/inference'
     damo_api = 'http://10.176.52.120:20101/inference'
     chatglm_api = 'http://10.176.52.120:20103/inference'
+    '''
+    
+    gpt_2_api = 'https://8edb7676c992.ngrok-free.app/inference'    
+    gpt_neo_api = 'https://7d220d903599.ngrok-free.app/inference'  
+    gpt_J_api = 'https://a834f69f8579.ngrok-free.app/inference'  
+    llama_api = 'https://0b041a10211a.ngrok-free.app/inference'   
+    # t5_api = 'https://bbbbb.ngrok.io/inference'
 
     en_model_apis = [gpt_2_api, gpt_neo_api, gpt_J_api, llama_api]
-    cn_model_apis = [wenzhong_api, sky_text_api, damo_api, chatglm_api]
+    '''cn_model_apis = [wenzhong_api, sky_text_api, damo_api, chatglm_api]'''
 
     en_labels = {
         'gpt2': 0,
@@ -89,6 +127,7 @@ def get_features(type, input_file, output_file):
         for data in tqdm(lines):
             line = data['text']
             label = data['label']
+            prompt_len = data.get("prompt_len", len(line))
 
             losses = []
             begin_idx_list = []
@@ -97,7 +136,7 @@ def get_features(type, input_file, output_file):
                 model_apis = en_model_apis
                 label_dict = en_labels
             elif type == 'cn':
-                model_apis = cn_model_apis
+                '''model_apis = cn_model_apis'''
                 label_dict = cn_labels
 
             label_int = label_dict[label]
@@ -123,7 +162,8 @@ def get_features(type, input_file, output_file):
                 'll_tokens_list': ll_tokens_list,
                 'label_int': label_int,
                 'label': label,
-                'text': line
+                'text': line,
+                'prompt_len': prompt_len
             }
 
             f.write(json.dumps(result, ensure_ascii=False) + '\n')
