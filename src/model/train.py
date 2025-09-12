@@ -361,14 +361,14 @@ if __name__ == "__main__":
         if args.model == 'CNN':
             print('-' * 32 + "CNN" + '-' * 32)
             classifier = ModelWiseCNNClassifier(id2labels=id2label)
-            ckpt_name = ''
+            ckpt_name = 'cnn_checkpoint.pt'
         elif args.model == 'RNN':
             print('-' * 32 + "RNN" + '-' * 32)
             classifier = TransformerOnlyClassifier(id2labels=id2label, seq_len=args.seq_len)
-            ckpt_name = ''
+            ckpt_name = 'rnn_checkpoint.pt'
         else:
             classifier = ModelWiseTransformerClassifier(id2labels=id2label, seq_len=args.seq_len)
-            ckpt_name = ''
+            ckpt_name = 'transformer_checkpoint.pt'
 
         trainer = SupervisedTrainer(data, classifier, en_labels, id2label, args)
 
