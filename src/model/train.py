@@ -109,13 +109,16 @@ class SupervisedTrainer:
             # test
             self.test()
             print('*' * 120)
-            torch.save(self.model.cpu(), ckpt_name)
+            '''torch.save(self.model.cpu(), ckpt_name)'''
+            torch.save(self.model.state_dict(), ckpt_name)
             self.model.to(self.device)
 
-        torch.save(self.model.cpu(), ckpt_name)
+        '''torch.save(self.model.cpu(), ckpt_name)
         saved_model = torch.load(ckpt_name)
-        self.model.load_state_dict(saved_model.state_dict())
-        return
+        self.model.load_state_dict(saved_model.state_dict())'''
+        torch.save(self.model.state_dict(), ckpt_name)
+        state_dict = torch.load(ckpt_name)
+        self.model.load_state_dict(state_dict)
 
     def test(self, content_level_eval=False):
         self.model.eval()
@@ -372,10 +375,15 @@ if __name__ == "__main__":
 
         trainer = SupervisedTrainer(data, classifier, en_labels, id2label, args)
 
-        if args.do_test:    
+        '''if args.do_test:    
             print("Log INFO: do test...")
             saved_model = torch.load(ckpt_name)
             trainer.model.load_state_dict(saved_model.state_dict())
+            trainer.test(content_level_eval=args.test_content)'''
+        if args.do_test:    
+            print("Log INFO: do test...")
+            state_dict = torch.load(ckpt_name)
+            trainer.model.load_state_dict(state_dict)
             trainer.test(content_level_eval=args.test_content)
         else:
             print("Log INFO: do train...")
