@@ -84,11 +84,11 @@ def get_features(type, input_file, output_file):
     chatglm_api = 'http://10.176.52.120:20103/inference'
     '''
     
-    gpt_2_api = 'https://8edb7676c992.ngrok-free.app/inference'    
-    gpt_neo_api = 'https://7d220d903599.ngrok-free.app/inference'  
-    gpt_J_api = 'https://a834f69f8579.ngrok-free.app/inference'  
-    llama_api = 'https://0b041a10211a.ngrok-free.app/inference'   
-    # t5_api = 'https://bbbbb.ngrok.io/inference'
+    gpt_2_api = 'https://7767b376a5d9.ngrok-free.app/inference' 
+    gpt_neo_api = 'https://0c67a2f270aa.ngrok-free.app/inference'  
+    gpt_J_api = 'https://ae47889762c5.ngrok-free.app/inference'  
+    llama_api = 'https://0ffb9c13b1d7.ngrok-free.app/inference'
+    # t5_api = cfg.T5_API
 
     en_model_apis = [gpt_2_api, gpt_neo_api, gpt_J_api, llama_api]
     '''cn_model_apis = [wenzhong_api, sky_text_api, damo_api, chatglm_api]'''

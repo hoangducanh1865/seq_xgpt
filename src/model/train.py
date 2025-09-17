@@ -172,7 +172,7 @@ class SupervisedTrainer:
         pass
     
     def content_level_eval(self, texts, true_labels, pred_labels):
-        from collections import Counter
+        '''from collections import Counter'''
 
         true_content_labels = []
         pred_content_labels = []
