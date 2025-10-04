@@ -6,7 +6,8 @@ import numpy as np
 import warnings
 import torch.nn.functional as F
 import torch.nn as nn
-
+import matplotlib
+matplotlib.use('Agg')
 
 from tqdm import tqdm, trange
 from sklearn.metrics import precision_score, recall_score
@@ -21,7 +22,7 @@ if project_path not in sys.path:
     sys.path.append(project_path)
 from src.utils import backend_model_info
 from src.model.dataloader import DataManager
-from src.model.model import ModelWiseCNNClassifier, ModelWiseTransformerClassifier, TransformerOnlyClassifier
+from src.model.model import ModelWiseCNNClassifier, ModelWiseTransformerClassifier, TransformerOnlyClassifier, SimpleTextClassifier
 
 
 
@@ -38,9 +39,16 @@ class SupervisedTrainer:
         self.lr = args.lr
         self.warm_up_ratio = args.warm_up_ratio
 
-        self.device = torch.device(
-            'cuda' if torch.cuda.is_available() else 'cpu')
-        # self.device = torch.device('cpu')
+        # CUDA device selection with debugging
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda')
+            print(f"CUDA is available. Using GPU: {torch.cuda.get_device_name()}")
+            print(f"CUDA version: {torch.version.cuda}")
+            print(f"PyTorch version: {torch.__version__}")
+        else:
+            self.device = torch.device('cpu')
+            print("CUDA not available, using CPU")
+        
         self.model.to(self.device)
         self._create_optimizer_and_scheduler()
 
@@ -95,14 +103,27 @@ class SupervisedTrainer:
                     output = self.model(inputs['features'], inputs['labels'])
                     logits = output['logits']
                     loss = output['loss']
-                    # print(loss.item())
+                    
+                    # Check for NaN or inf loss
+                    if torch.isnan(loss) or torch.isinf(loss):
+                        print(f"WARNING: Invalid loss detected at step {step}: {loss.item()}")
+                        continue
+                    
                     self.optimizer.zero_grad()
                     loss.backward()
+                    
+                    # Gradient clipping to prevent exploding gradients
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                    
                     self.optimizer.step()
                     self.scheduler.step()
 
                     tr_loss += loss.item()
                     nb_tr_steps += 1
+                    
+                    # Print training progress occasionally
+                    if step % 100 == 0:
+                        print(f"Step {step}, Loss: {loss.item():.4f}, LR: {self.scheduler.get_last_lr()[0]:.2e}")
 
             loss = tr_loss / nb_tr_steps
             print(f'epoch {epoch+1}: train_loss {loss}')
@@ -126,6 +147,8 @@ class SupervisedTrainer:
         true_labels = []
         pred_labels = []
         total_logits = []
+        print(f"Starting test with {len(self.data.test_dataloader)} batches")
+        
         for step, inputs in enumerate(
                 tqdm(self.data.test_dataloader, desc="Iteration")):
             for k, v in inputs.items():
@@ -136,6 +159,14 @@ class SupervisedTrainer:
                 output = self.model(inputs['features'], inputs['labels'])
                 logits = output['logits']
                 preds = output['preds']
+                
+                # Debug first batch
+                if step == 0:
+                    print(f"First batch - Features shape: {inputs['features'].shape}")
+                    print(f"First batch - Labels shape: {labels.shape}")
+                    print(f"First batch - Unique labels: {torch.unique(labels)}")
+                    print(f"First batch - Preds shape: {preds.shape}")
+                    print(f"First batch - Unique preds: {torch.unique(preds)}")
                 
                 texts.extend(inputs['text'])
                 pred_labels.extend(preds.cpu().tolist())
@@ -149,6 +180,17 @@ class SupervisedTrainer:
         #     f.write(json.dumps(pred_labels[3], ensure_ascii=False) + '\n')
 
 
+        # Debug collected data
+        print(f"\nTotal samples collected: {len(texts)}")
+        if len(true_labels) > 0:
+            print(f"Sample true_labels shape: {np.array(true_labels[0]).shape}")
+            print(f"Sample pred_labels shape: {np.array(pred_labels[0]).shape}")
+            print(f"Sample true_labels[0][:10]: {true_labels[0][:10] if len(true_labels[0]) > 0 else 'Empty'}")
+            print(f"Sample pred_labels[0][:10]: {pred_labels[0][:10] if len(pred_labels[0]) > 0 else 'Empty'}")
+        else:
+            print("WARNING: No data collected!")
+            return
+        
         if content_level_eval:
             # content level evaluation
             print("*" * 8, "Content Level Evalation", "*" * 8)
@@ -162,11 +204,27 @@ class SupervisedTrainer:
         print("*" * 8, "Word Level Evalation", "*" * 8)
         true_labels = np.array(true_labels)
         pred_labels = np.array(pred_labels)
+        print(f"Before reshape - true_labels shape: {true_labels.shape}")
+        print(f"Before reshape - pred_labels shape: {pred_labels.shape}")
+        
         true_labels_1d = true_labels.reshape(-1)
         pred_labels_1d = pred_labels.reshape(-1)
+        print(f"Before filtering - unique true labels: {np.unique(true_labels_1d)}")
+        print(f"Before filtering - unique pred labels: {np.unique(pred_labels_1d)}")
+        
         mask = true_labels_1d != -1
+        print(f"Valid labels count: {mask.sum()} out of {len(mask)}")
+        
+        if mask.sum() == 0:
+            print("ERROR: No valid labels found after filtering!")
+            print("Accuracy: nan")
+            return
+        
         true_labels_1d = true_labels_1d[mask]
         pred_labels_1d = pred_labels_1d[mask]
+        print(f"After filtering - unique true labels: {np.unique(true_labels_1d)}")
+        print(f"After filtering - unique pred labels: {np.unique(pred_labels_1d)}")
+        
         accuracy = (true_labels_1d == pred_labels_1d).astype(np.float32).mean().item()
         print("Accuracy: {:.1f}".format(accuracy*100))
         pass
@@ -195,13 +253,26 @@ class SupervisedTrainer:
     def sent_level_eval(self, texts, true_labels, pred_labels):
         """
         """
+        print(f"Processing {len(texts)} texts for sentence-level evaluation")
         true_sent_labels = []
         pred_sent_labels = []
-        for text, true_label, pred_label in zip(texts, true_labels, pred_labels):
+        
+        for i, (text, true_label, pred_label) in enumerate(zip(texts, true_labels, pred_labels)):
             true_sent_label = self.get_sent_label(text, true_label)
             pred_sent_label = self.get_sent_label(text, pred_label)
+            
+            if i == 0:  # Debug first sample
+                print(f"First sample - true_sent_label: {true_sent_label}")
+                print(f"First sample - pred_sent_label: {pred_sent_label}")
+            
             true_sent_labels.extend(true_sent_label)
             pred_sent_labels.extend(pred_sent_label)
+        
+        print(f"Total sentence labels collected: {len(true_sent_labels)}")
+        
+        if len(true_sent_labels) == 0:
+            print("ERROR: No sentence labels collected!")
+            return {"precision": [], "recall": [], "accuracy": float('nan'), "macro_f1": float('nan')}
         
         true_sent_labels = [self.en_labels[label] for label in true_sent_labels]
         pred_sent_labels = [self.en_labels[label] for label in pred_sent_labels]
@@ -247,19 +318,40 @@ class SupervisedTrainer:
         return most_common_tag
 
     def _get_precision_recall_acc_macrof1(self, true_labels, pred_labels):
-        accuracy = accuracy_score(true_labels, pred_labels)
-        macro_f1 = f1_score(true_labels, pred_labels, average='macro')
-        print("Accuracy: {:.1f}".format(accuracy*100))
-        print("Macro F1 Score: {:.1f}".format(macro_f1*100))
+        print(f"\nEvaluating with {len(true_labels)} true labels and {len(pred_labels)} pred labels")
+        
+        if len(true_labels) == 0 or len(pred_labels) == 0:
+            print("ERROR: Empty label arrays!")
+            print("Accuracy: nan")
+            print("Macro F1 Score: nan")
+            return {"precision": [], "recall": [], "accuracy": float('nan'), "macro_f1": float('nan')}
+        
+        print(f"Unique true labels: {set(true_labels)}")
+        print(f"Unique pred labels: {set(pred_labels)}")
+        
+        # Check if all predictions are the same class
+        if len(set(pred_labels)) == 1:
+            print("WARNING: All predictions are the same class!")
+        
+        try:
+            accuracy = accuracy_score(true_labels, pred_labels)
+            macro_f1 = f1_score(true_labels, pred_labels, average='macro', zero_division=0)
+            print("Accuracy: {:.1f}".format(accuracy*100))
+            print("Macro F1 Score: {:.1f}".format(macro_f1*100))
 
-        precision = precision_score(true_labels, pred_labels, average=None)
-        recall = recall_score(true_labels, pred_labels, average=None)
-        print("Precision/Recall per class: ")
-        precision_recall = ' '.join(["{:.1f}/{:.1f}".format(p*100, r*100) for p, r in zip(precision, recall)])
-        print(precision_recall)
+            precision = precision_score(true_labels, pred_labels, average=None, zero_division=0)
+            recall = recall_score(true_labels, pred_labels, average=None, zero_division=0)
+            print("Precision/Recall per class: ")
+            precision_recall = ' '.join(["{:.1f}/{:.1f}".format(p*100, r*100) for p, r in zip(precision, recall)])
+            print(precision_recall)
 
-        result = {"precision":precision, "recall":recall, "accuracy":accuracy, "macro_f1":macro_f1}
-        return result
+            result = {"precision":precision, "recall":recall, "accuracy":accuracy, "macro_f1":macro_f1}
+            return result
+        except Exception as e:
+            print(f"ERROR in metric calculation: {e}")
+            print("Accuracy: nan")
+            print("Macro F1 Score: nan")
+            return {"precision": [], "recall": [], "accuracy": float('nan'), "macro_f1": float('nan')}
 
 
 def construct_bmes_labels(labels):
@@ -322,7 +414,7 @@ def parse_args():
     parser.add_argument('--train_path', type=str, default='')
     parser.add_argument('--test_path', type=str, default='')
 
-    parser.add_argument('--num_train_epochs', type=int, default=20)
+    parser.add_argument('--num_train_epochs', type=int, default=1)
     parser.add_argument('--weight_decay', type=float, default=0.1)
     parser.add_argument('--lr', type=float, default=5e-5)
     parser.add_argument('--warm_up_ratio', type=float, default=0.1)
@@ -361,7 +453,16 @@ if __name__ == "__main__":
     """linear classify"""
     if args.train_mode == 'classify':
         print('-' * 32 + 'classify' + '-' * 32)
-        if args.model == 'CNN':
+        if args.model == 'Simple':
+            print('-' * 32 + "Simple Text Classifier" + '-' * 32)
+            classifier = SimpleTextClassifier(
+                id2labels=id2label, 
+                input_dim=4, 
+                hidden_dim=128, 
+                class_weights=data.class_weights
+            )
+            ckpt_name = 'simple_checkpoint.pt'
+        elif args.model == 'CNN':
             print('-' * 32 + "CNN" + '-' * 32)
             classifier = ModelWiseCNNClassifier(id2labels=id2label)
             ckpt_name = 'cnn_checkpoint.pt'

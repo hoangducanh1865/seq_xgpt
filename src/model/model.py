@@ -8,6 +8,85 @@ from fastNLP.modules.torch import MLP,ConditionalRandomField,allowed_transitions
 from torch.nn import CrossEntropyLoss
 
 
+class SimpleTextClassifier(nn.Module):
+    """Simple classifier that works with basic text features instead of complex perplexity features"""
+    
+    def __init__(self, id2labels, input_dim=4, hidden_dim=128, dropout_rate=0.1, class_weights=None):
+        super(SimpleTextClassifier, self).__init__()
+        
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.label_num = len(id2labels)
+        self.class_weights = class_weights
+        
+        # Improved feature encoder with layer norm (better for sequences)
+        self.feature_encoder = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate / 2)
+        )
+        
+        # Final classifier layer
+        self.classifier = nn.Linear(hidden_dim // 2, self.label_num)
+        
+        # Initialize weights properly
+        self._init_weights()
+        
+        # CRF layer
+        self.crf = ConditionalRandomField(num_tags=self.label_num, allowed_transitions=allowed_transitions(id2labels))
+    
+    def _init_weights(self):
+        """Initialize model weights properly"""
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+        
+    def forward(self, x, labels):
+        # x shape: [batch_size, seq_len, input_dim]
+        batch_size, seq_len, _ = x.shape
+        
+        # Process features through encoder
+        hidden_states = self.feature_encoder(x)  # [batch_size, seq_len, hidden_dim]
+        logits = self.classifier(hidden_states)  # [batch_size, seq_len, label_num]
+        
+        # Create mask for valid positions (not padding)
+        mask = labels.gt(-1) if labels is not None else torch.ones(batch_size, seq_len, dtype=torch.bool, device=x.device)
+        
+        if self.training and labels is not None:
+            # Hybrid loss: CRF + weighted cross-entropy for better class balance
+            crf_loss = self.crf(logits=logits, tags=labels, mask=mask)
+            crf_loss = -crf_loss  # CRF returns negative log-likelihood
+            
+            # Add weighted cross-entropy loss for class balancing
+            if self.class_weights is not None:
+                ce_loss_fct = CrossEntropyLoss(weight=self.class_weights.to(logits.device), ignore_index=-1)
+                ce_loss = ce_loss_fct(logits.view(-1, self.label_num), labels.view(-1))
+                # Combine losses: 0.7 CRF + 0.3 weighted CE
+                loss = 0.7 * crf_loss + 0.3 * ce_loss
+            else:
+                loss = crf_loss
+            
+            output = {'loss': loss, 'logits': logits}
+        else:
+            # Use CRF for prediction
+            paths, scores = self.crf.viterbi_decode(logits=logits, mask=mask)
+            # Set invalid positions to -1
+            paths[mask==0] = -1
+            output = {'preds': paths, 'logits': logits}
+        
+        return output
+
+
 class ConvFeatureExtractionModel(nn.Module):
 
     def __init__(
