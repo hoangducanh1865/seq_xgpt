@@ -169,8 +169,24 @@ class SupervisedTrainer:
                     print(f"First batch - Unique preds: {torch.unique(preds)}")
                 
                 texts.extend(inputs['text'])
-                pred_labels.extend(preds.cpu().tolist())
-                true_labels.extend(labels.cpu().tolist())
+                
+                # For document-level classification
+                if len(preds.shape) == 1:  # Document-level predictions [batch_size]
+                    pred_labels.extend(preds.cpu().tolist())
+                    # Extract document labels from sequence labels (first valid label)
+                    doc_true_labels = []
+                    for i in range(labels.shape[0]):
+                        valid_mask = labels[i] != -1
+                        if valid_mask.any():
+                            doc_label = labels[i][valid_mask][0].item()
+                        else:
+                            doc_label = 0  # Fallback
+                        doc_true_labels.append(doc_label)
+                    true_labels.extend(doc_true_labels)
+                else:  # Sequence-level predictions (old way)
+                    pred_labels.extend(preds.cpu().tolist())
+                    true_labels.extend(labels.cpu().tolist())
+                
                 total_logits.extend(logits.cpu().tolist())
         
         # with open("", 'w') as f:
@@ -183,41 +199,58 @@ class SupervisedTrainer:
         # Debug collected data
         print(f"\nTotal samples collected: {len(texts)}")
         if len(true_labels) > 0:
-            print(f"Sample true_labels shape: {np.array(true_labels[0]).shape}")
-            print(f"Sample pred_labels shape: {np.array(pred_labels[0]).shape}")
-            print(f"Sample true_labels[0][:10]: {true_labels[0][:10] if len(true_labels[0]) > 0 else 'Empty'}")
-            print(f"Sample pred_labels[0][:10]: {pred_labels[0][:10] if len(pred_labels[0]) > 0 else 'Empty'}")
+            # Check if we have document-level or sequence-level labels
+            sample_true = true_labels[0]
+            sample_pred = pred_labels[0]
+            
+            if isinstance(sample_true, int):  # Document-level
+                print("Document-level classification detected")
+                print(f"Sample true_labels (first 10): {true_labels[:10]}")
+                print(f"Sample pred_labels (first 10): {pred_labels[:10]}")
+            else:  # Sequence-level
+                print("Sequence-level classification detected")
+                print(f"Sample true_labels shape: {np.array(sample_true).shape}")
+                print(f"Sample pred_labels shape: {np.array(sample_pred).shape}")
+                print(f"Sample true_labels[0][:10]: {sample_true[:10] if len(sample_true) > 10 else sample_true}")
+                print(f"Sample pred_labels[0][:10]: {sample_pred[:10] if len(sample_pred) > 10 else sample_pred}")
         else:
             print("WARNING: No data collected!")
             return
         
-        if content_level_eval:
-            # content level evaluation
-            print("*" * 8, "Content Level Evalation", "*" * 8)
-            content_result = self.content_level_eval(texts, true_labels, pred_labels)
+        # Check if we have document-level or sequence-level predictions
+        if isinstance(true_labels[0], int):
+            # Document-level evaluation
+            print("*" * 8, "Document Level Evaluation", "*" * 8)
+            self.document_level_eval(true_labels, pred_labels)
         else:
-            # sent level evalation
-            print("*" * 8, "Sentence Level Evalation", "*" * 8)
-            sent_result = self.sent_level_eval(texts, true_labels, pred_labels)
+            # Original sequence-level evaluation
+            if content_level_eval:
+                # content level evaluation
+                print("*" * 8, "Content Level Evalation", "*" * 8)
+                content_result = self.content_level_eval(texts, true_labels, pred_labels)
+            else:
+                # sent level evalation
+                print("*" * 8, "Sentence Level Evalation", "*" * 8)
+                sent_result = self.sent_level_eval(texts, true_labels, pred_labels)
 
-        # word level evalation
-        print("*" * 8, "Word Level Evalation", "*" * 8)
-        true_labels = np.array(true_labels)
-        pred_labels = np.array(pred_labels)
-        print(f"Before reshape - true_labels shape: {true_labels.shape}")
-        print(f"Before reshape - pred_labels shape: {pred_labels.shape}")
-        
-        true_labels_1d = true_labels.reshape(-1)
-        pred_labels_1d = pred_labels.reshape(-1)
-        print(f"Before filtering - unique true labels: {np.unique(true_labels_1d)}")
-        print(f"Before filtering - unique pred labels: {np.unique(pred_labels_1d)}")
-        
-        mask = true_labels_1d != -1
-        print(f"Valid labels count: {mask.sum()} out of {len(mask)}")
-        
-        if mask.sum() == 0:
-            print("ERROR: No valid labels found after filtering!")
-            print("Accuracy: nan")
+            # word level evalation
+            print("*" * 8, "Word Level Evalation", "*" * 8)
+            true_labels = np.array(true_labels)
+            pred_labels = np.array(pred_labels)
+            print(f"Before reshape - true_labels shape: {true_labels.shape}")
+            print(f"Before reshape - pred_labels shape: {pred_labels.shape}")
+            
+            true_labels_1d = true_labels.reshape(-1)
+            pred_labels_1d = pred_labels.reshape(-1)
+            print(f"Before filtering - unique true labels: {np.unique(true_labels_1d)}")
+            print(f"Before filtering - unique pred labels: {np.unique(pred_labels_1d)}")
+            
+            mask = true_labels_1d != -1
+            print(f"Valid labels count: {mask.sum()} out of {len(mask)}")
+            
+            if mask.sum() == 0:
+                print("ERROR: No valid labels found after filtering!")
+                print("Accuracy: nan")
             return
         
         true_labels_1d = true_labels_1d[mask]
@@ -249,6 +282,44 @@ class SupervisedTrainer:
         pred_content_labels = [self.en_labels[label] for label in pred_content_labels]
         result = self._get_precision_recall_acc_macrof1(true_content_labels, pred_content_labels)
         return result
+
+
+    def document_level_eval(self, true_labels, pred_labels):
+        """Evaluate document-level classification"""
+        from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+        
+        true_labels = np.array(true_labels)
+        pred_labels = np.array(pred_labels)
+        
+        print(f"Total documents: {len(true_labels)}")
+        print(f"Unique true labels: {np.unique(true_labels)}")
+        print(f"Unique pred labels: {np.unique(pred_labels)}")
+        
+        # Calculate accuracy
+        accuracy = accuracy_score(true_labels, pred_labels)
+        print(f"Document Accuracy: {accuracy:.1%}")
+        
+        # Calculate per-class metrics
+        report = classification_report(true_labels, pred_labels, 
+                                     target_names=[self.id2label[i] for i in range(len(self.id2label))],
+                                     output_dict=True, zero_division=0)
+        
+        print("\nPer-class metrics:")
+        for label_id, label_name in self.id2label.items():
+            if str(label_id) in report:
+                metrics = report[str(label_id)]
+                print(f"{label_name}: Precision={metrics['precision']:.3f}, Recall={metrics['recall']:.3f}, F1={metrics['f1-score']:.3f}")
+        
+        # Overall metrics
+        print(f"\nOverall Macro F1: {report['macro avg']['f1-score']:.3f}")
+        print(f"Overall Weighted F1: {report['weighted avg']['f1-score']:.3f}")
+        
+        # Confusion matrix
+        cm = confusion_matrix(true_labels, pred_labels)
+        print("\nConfusion Matrix:")
+        print(cm)
+        
+        return accuracy, report
 
     def sent_level_eval(self, texts, true_labels, pred_labels):
         """
@@ -433,20 +504,22 @@ if __name__ == "__main__":
         print("Log INFO: split dataset...")
         split_dataset(data_path=args.data_path, train_path=args.train_path, test_path=args.test_path, train_ratio=args.train_ratio)
 
-    # en_labels = backend_model_info.en_labels
+    # Create proper label mapping for the actual labels in your data
     en_labels = {
         'gpt2': 0,
         'gptneo': 1,
         'gptj': 2,
         'llama': 3,
         'gpt3re': 4,
-        # 'gpt3sum': 3,
         'human': 5
     }
-    # en_labels = {'AI':0, 'human':1}
-
-    id2label = construct_bmes_labels(en_labels)
-    label2id = {v: k for k, v in id2label.items()}
+    
+    # For Simple classifier, use direct label mapping (no BMES)
+    id2label = {v: k for k, v in en_labels.items()}  # {0: 'gpt2', 1: 'gptneo', ...}
+    label2id = en_labels  # {'gpt2': 0, 'gptneo': 1, ...}
+    
+    print(f"Label mapping: {en_labels}")
+    print(f"ID to label: {id2label}")
 
     data = DataManager(train_path=args.train_path, test_path=args.test_path, batch_size=args.batch_size, max_len=args.seq_len, human_label='human', id2label=id2label)
     
@@ -459,7 +532,8 @@ if __name__ == "__main__":
                 id2labels=id2label, 
                 input_dim=4, 
                 hidden_dim=128, 
-                class_weights=data.class_weights
+                class_weights=data.class_weights,
+                use_crf=False  # Disable CRF for stability
             )
             ckpt_name = 'simple_checkpoint.pt'
         elif args.model == 'CNN':

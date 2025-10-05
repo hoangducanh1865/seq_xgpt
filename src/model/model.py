@@ -9,17 +9,18 @@ from torch.nn import CrossEntropyLoss
 
 
 class SimpleTextClassifier(nn.Module):
-    """Simple classifier that works with basic text features instead of complex perplexity features"""
+    """Simple classifier for document-level classification (not token-level)"""
     
-    def __init__(self, id2labels, input_dim=4, hidden_dim=128, dropout_rate=0.1, class_weights=None):
+    def __init__(self, id2labels, input_dim=4, hidden_dim=128, dropout_rate=0.1, class_weights=None, use_crf=False):
         super(SimpleTextClassifier, self).__init__()
         
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.label_num = len(id2labels)
         self.class_weights = class_weights
+        self.use_crf = False  # Force disable CRF for document classification
         
-        # Improved feature encoder with layer norm (better for sequences)
+        # Feature encoder for token-level features
         self.feature_encoder = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
@@ -28,20 +29,28 @@ class SimpleTextClassifier(nn.Module):
             nn.Linear(hidden_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
             nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate / 2)
+            nn.Dropout(dropout_rate)
         )
         
-        # Final classifier layer
-        self.classifier = nn.Linear(hidden_dim // 2, self.label_num)
+        # Pooling layer to aggregate sequence into document representation
+        self.pooling = nn.AdaptiveAvgPool1d(1)
+        
+        # Document-level classifier
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(hidden_dim // 2, self.label_num)
+        )
         
         # Initialize weights properly
         self._init_weights()
         
-        # CRF layer
-        self.crf = ConditionalRandomField(num_tags=self.label_num, allowed_transitions=allowed_transitions(id2labels))
+        # CRF layer (optional)
+        if self.use_crf:
+            self.crf = ConditionalRandomField(num_tags=self.label_num, allowed_transitions=allowed_transitions(id2labels))
+        else:
+            self.crf = None
     
     def _init_weights(self):
         """Initialize model weights properly"""
@@ -57,32 +66,41 @@ class SimpleTextClassifier(nn.Module):
         
         # Process features through encoder
         hidden_states = self.feature_encoder(x)  # [batch_size, seq_len, hidden_dim]
-        logits = self.classifier(hidden_states)  # [batch_size, seq_len, label_num]
         
-        # Create mask for valid positions (not padding)
-        mask = labels.gt(-1) if labels is not None else torch.ones(batch_size, seq_len, dtype=torch.bool, device=x.device)
+        # Pool sequence to get document-level representation
+        # Transpose for pooling: [batch_size, hidden_dim, seq_len]
+        pooled = self.pooling(hidden_states.transpose(1, 2))  # [batch_size, hidden_dim, 1]
+        pooled = pooled.squeeze(-1)  # [batch_size, hidden_dim]
+        
+        # Document-level classification
+        logits = self.classifier(pooled)  # [batch_size, label_num]
         
         if self.training and labels is not None:
-            # Hybrid loss: CRF + weighted cross-entropy for better class balance
-            crf_loss = self.crf(logits=logits, tags=labels, mask=mask)
-            crf_loss = -crf_loss  # CRF returns negative log-likelihood
+            # Use document-level labels (take first non-padding label per sample)
+            doc_labels = []
+            for i in range(batch_size):
+                # Find first valid label in sequence
+                valid_mask = labels[i] != -1
+                if valid_mask.any():
+                    doc_label = labels[i][valid_mask][0]  # Take first valid label
+                else:
+                    doc_label = torch.tensor(0, device=labels.device)  # Fallback
+                doc_labels.append(doc_label)
             
-            # Add weighted cross-entropy loss for class balancing
+            doc_labels = torch.stack(doc_labels)
+            
+            # Use weighted cross-entropy loss
             if self.class_weights is not None:
-                ce_loss_fct = CrossEntropyLoss(weight=self.class_weights.to(logits.device), ignore_index=-1)
-                ce_loss = ce_loss_fct(logits.view(-1, self.label_num), labels.view(-1))
-                # Combine losses: 0.7 CRF + 0.3 weighted CE
-                loss = 0.7 * crf_loss + 0.3 * ce_loss
+                loss_fct = CrossEntropyLoss(weight=self.class_weights.to(logits.device))
             else:
-                loss = crf_loss
+                loss_fct = CrossEntropyLoss()
             
+            loss = loss_fct(logits, doc_labels)
             output = {'loss': loss, 'logits': logits}
         else:
-            # Use CRF for prediction
-            paths, scores = self.crf.viterbi_decode(logits=logits, mask=mask)
-            # Set invalid positions to -1
-            paths[mask==0] = -1
-            output = {'preds': paths, 'logits': logits}
+            # Prediction mode - return document-level predictions
+            preds = torch.argmax(logits, dim=-1)  # [batch_size]
+            output = {'preds': preds, 'logits': logits}
         
         return output
 

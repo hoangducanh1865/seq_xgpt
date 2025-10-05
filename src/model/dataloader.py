@@ -45,6 +45,10 @@ class DataManager:
             self.class_weights = self._calculate_class_weights(train_dict['label'])
             print(f"Calculated class weights: {self.class_weights}")
             
+            # Debug: Print label mappings
+            print(f"Available labels in label2id: {list(self.label2id.keys())[:10]}...")  # First 10
+            print(f"Human label: {self.human_label}")
+            
             data["train"] = Dataset.from_dict(train_dict)
         
         if test_path:
@@ -178,23 +182,30 @@ class DataManager:
         pad_masks = (1 - masks) * self.label_pad_idx
 
         for idx, p_len in enumerate(prompt_len):
-            prefix_len = len(self.split_sentence(text[idx][:p_len]))
-            if prefix_len > self.max_len:
-                prefix_ids = self.sequence_labels_to_ids(self.max_len, self.human_label)
-                masks[idx][:] = prefix_ids[:]
-                continue
-            total_len = len(self.split_sentence(text[idx]))
-            
-            if prefix_len > 0:
-                prefix_ids = self.sequence_labels_to_ids(prefix_len, self.human_label)
-                masks[idx][:prefix_len] = prefix_ids[:]
-            if total_len - prefix_len > 0:
-                if total_len > self.max_len:
-                    human_ids = self.sequence_labels_to_ids(self.max_len - prefix_len, label[idx])
-                else:
-                    human_ids = self.sequence_labels_to_ids(total_len - prefix_len, label[idx])
-                masks[idx][prefix_len:total_len] = human_ids[:]
-            masks[idx] += pad_masks[idx]
+            try:
+                text_tokens = self.split_sentence(text[idx])
+                prefix_len = len(self.split_sentence(text[idx][:p_len])) if p_len < len(text[idx]) else len(text_tokens)
+                total_len = len(text_tokens)
+                
+                # Ensure lengths don't exceed max_len
+                prefix_len = min(prefix_len, self.max_len)
+                total_len = min(total_len, self.max_len)
+                
+                # Document-level labeling - assign target label to first position only
+                target_label_id = self.label2id.get(label[idx], 0)
+                
+                # Put document label in first position, rest are padding
+                masks[idx][0] = target_label_id  # Document label
+                masks[idx][1:] = self.label_pad_idx  # Padding
+                
+                # Note: pad_masks already handled padding
+                
+            except Exception as e:
+                print(f"Error processing sample {idx}: {e}")
+                # Fallback: document-level labeling
+                target_label_id = self.label2id.get(label[idx], 0)
+                masks[idx][0] = target_label_id
+                masks[idx][1:] = self.label_pad_idx
 
         batch['features'] = features
         batch['labels'] = masks
@@ -206,15 +217,31 @@ class DataManager:
     def sequence_labels_to_ids(self, seq_len, label):
         prefix = ['B-', 'M-', 'E-', 'S-']
         if seq_len <= 0:
-            return None
+            return torch.tensor([], dtype=torch.long)  # Return empty tensor instead of None
         elif seq_len == 1:
-            label = 'S-' + label
-            return torch.tensor([self.label2id[label]], dtype=torch.long)
+            label_key = 'S-' + label
+            if label_key in self.label2id:
+                return torch.tensor([self.label2id[label_key]], dtype=torch.long)
+            else:
+                # Fallback to base label if BMES format not available
+                base_label = label if label in self.label2id else list(self.label2id.keys())[0]
+                return torch.tensor([self.label2id[base_label]], dtype=torch.long)
         else:
             ids = []
-            ids.append(self.label2id['B-'+label])
-            ids.extend([self.label2id['M-'+label]] * (seq_len - 2))
-            ids.append(self.label2id['E-'+label])
+            # Try BMES format first
+            b_label = 'B-' + label
+            m_label = 'M-' + label  
+            e_label = 'E-' + label
+            
+            if b_label in self.label2id and m_label in self.label2id and e_label in self.label2id:
+                ids.append(self.label2id[b_label])
+                ids.extend([self.label2id[m_label]] * (seq_len - 2))
+                ids.append(self.label2id[e_label])
+            else:
+                # Fallback to simple label repetition
+                base_label = label if label in self.label2id else list(self.label2id.keys())[0]
+                ids = [self.label2id[base_label]] * seq_len
+            
             return torch.tensor(ids, dtype=torch.long)
 
     def process_and_convert_to_tensor(self, data):
