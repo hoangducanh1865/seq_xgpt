@@ -70,50 +70,34 @@ def get_features(type, input_file, output_file):
     get [losses, begin_idx_list, ll_tokens_list, label_int, label] based on raw lines
     """
 
-    en_model_names = ['gpt_2', 'gpt_neo', 'gpt_J', 'llama']
-    cn_model_names = ['wenzhong', 'sky_text', 'damo', 'chatglm']
+    en_model_names = ['deepseek', 't5', 'gpt_j', 'llama3', 'llama', 'mixtral', 'claude']
     
-    '''
-    gpt_2_api = 'http://10.176.52.120:20098/inference'
-    gpt_neo_api = 'http://10.176.52.120:20097/inference'
-    gpt_J_api = 'http://10.176.52.120:20099/inference'
-    llama_api = 'http://10.176.52.120:20100/inference'
-    wenzhong_api = 'http://10.176.52.101:20160/inference'
-    sky_text_api = 'http://10.176.52.120:20102/inference'
-    damo_api = 'http://10.176.52.120:20101/inference'
-    chatglm_api = 'http://10.176.52.120:20103/inference'
-    '''
-    
-    gpt_2_api = 'https://7767b376a5d9.ngrok-free.app/inference' 
-    gpt_neo_api = 'https://0c67a2f270aa.ngrok-free.app/inference'  
-    gpt_J_api = 'https://ae47889762c5.ngrok-free.app/inference'  
+    deepseek_api = 'https://7767b376a5d9.ngrok-free.app/inference' 
+    t5_api = 'https://0c67a2f270aa.ngrok-free.app/inference'  
+    gpt_j_api = 'https://ae47889762c5.ngrok-free.app/inference'  
+    llama3_api = 'https://0ffb9c13b1d7.ngrok-free.app/inference'
     llama_api = 'https://0ffb9c13b1d7.ngrok-free.app/inference'
-    # t5_api = cfg.T5_API
+    mixtral_api = 'https://0ffb9c13b1d7.ngrok-free.app/inference'
+    claude_api = 'https://0ffb9c13b1d7.ngrok-free.app/inference'
 
-    en_model_apis = [gpt_2_api, gpt_neo_api, gpt_J_api, llama_api]
-    '''cn_model_apis = [wenzhong_api, sky_text_api, damo_api, chatglm_api]'''
+    en_model_apis = [deepseek_api, t5_api, gpt_j_api, llama3_api, llama_api, mixtral_api, claude_api]
 
     en_labels = {
-        'gpt2': 0,
-        'gptneo': 1,
-        'gptj': 1,
-        'llama': 2,
-        'gpt3re': 3,
-        'gpt3sum': 3,
-        'human': 4,
-        'alpaca': None,
-        'dolly': None,
-    }
-
-    cn_labels = {
-        'wenzhong': 0,
-        'sky_text': 1,
-        'damo': 2,
-        'chatglm': 3,
-        'gpt3re': 4,
-        'gpt3sum': 4,
-        'human': 5,
-        'moss': 6
+        'human': 0,
+        'deepseek': 1,
+        'gemini': 2,
+        'gpt': 3,
+        'llama3': 4,
+        'llama': 5,
+        'mixtral': 6,
+        'claude': 7,
+        'human---deepseek': 8,
+        'human---gemini': 9,
+        'human---gpt': 10,
+        'human---llama3': 11,
+        'human---llama': 12,
+        'human---mixtral': 13,
+        'human---claude': 14,
     }
 
     # line = {'text': '', 'label': ''}
@@ -291,8 +275,8 @@ def process_features(input_file, output_file, do_normalize=False):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_file", type=str, help="input file")
-    parser.add_argument("--output_file", type=str, help="output file")
+    parser.add_argument('--data_type', type=str) # ['train_data', 'test_data']
+    parser.add_argument('--dataset', type=str) # ['faid', 'hart', 'llm_detectaive']
     # parser.add_argument("--add_loss", type=bool, default=True, help="when processing features, add loss")
     # parser.add_argument("--add_pct", type=bool, default=True, help="when processing features, add lt_zero_pct")
     # parser.add_argument("--add_std", type=bool, default=True, help="when processing features, add std")
@@ -307,9 +291,11 @@ def parse_args():
     parser.add_argument("--do_normalize", action="store_true", help="normalize the features")
     return parser.parse_args()
 
-
 if __name__ == "__main__":
     args = parse_args()
+    
+    input_file = 'data/datasets/' + args.dataset + '/' + args.data_type + '.jsonl'
+    output_file = 'data/datasets/' + args.dataset + '/' + args.data_type + '_with_features.jsonl'
 
     if args.get_en_features:
         """
@@ -320,7 +306,7 @@ if __name__ == "__main__":
         python gen_features.py --get_en_features --input_file gpt3_ablation_data/gpt3_ablation_train_lines.jsonl --output_file ../features/gpt3_ablation_features/gpt3_ablation_train_features.jsonl
         python gen_features.py --get_en_features --input_file gpt3_ablation_data/gpt3_ablation_test_lines.jsonl --output_file ../features/gpt3_ablation_features/gpt3_ablation_test_features.jsonl
         """
-        get_features(type='en', input_file=args.input_file, output_file=args.output_file)
+        get_features(type='en', input_file=input_file, output_file=output_file)
 
     elif args.get_cn_features:
         """
@@ -329,7 +315,7 @@ if __name__ == "__main__":
 
         python gen_features.py --get_cn_features --input_file aligned_data/cn_moss_aligned_lines.jsonl --output_file ../features/aligned_features/cn_moss_aligned_features.jsonl
         """
-        get_features(type='cn', input_file=args.input_file, output_file=args.output_file)
+        get_features(type='cn', input_file=input_file, output_file=output_file)
 
     elif args.get_en_features_multithreading:
         """
@@ -401,7 +387,23 @@ if __name__ == "__main__":
     elif args.process_features:
         
         print(args.do_normalize)
-        process_features(args.input_file, args.output_file, args.do_normalize)
+        process_features(input_file, output_file, args.do_normalize)
+
+    else:
+        print("please select an action")
+                           '../features/aligned_features/cn_sky_text_aligned_features.jsonl']
+        threads = []
+        for i in range(len(cn_input_files)):
+            t = threading.Thread(target=get_features, args=('cn', cn_input_files[i], cn_output_files[i]))
+            threads.append(t)
+            t.start()
+        for t in threads:
+            t.join()
+
+    elif args.process_features:
+        
+        print(args.do_normalize)
+        process_features(input_file, output_file, args.do_normalize)
 
     else:
         print("please select an action")

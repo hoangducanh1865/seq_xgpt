@@ -551,3 +551,132 @@ class SnifferStableLMTunedModel(SnifferBaseModel):
             return gen_texts[0]
         else:
             return gen_texts
+
+
+class SnifferLlama3Model(SnifferBaseModel):
+    """
+    Llama 3 model for text detection
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.do_generate = None
+        self.text = None
+        model_path = 'meta-llama/Llama-3-8B'
+        self.base_tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.base_tokenizer.pad_token_id = self.base_tokenizer.eos_token_id
+        self.base_model = AutoModelForCausalLM.from_pretrained(model_path,
+                                                           device_map="auto",
+                                                           load_in_8bit=True)
+        self.ppl_calculator = SPLlamaTokenizerPPLCalc(self.base_model,
+                                                      self.base_tokenizer,
+                                                      self.device)
+
+    def forward_calc_ppl(self):
+        self.base_tokenizer.padding_side = 'right'
+        return self.ppl_calculator.forward_calc_ppl(self.text)
+
+
+class SnifferDeepSeekModel(SnifferBaseModel):
+    """
+    DeepSeek model for text detection
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.do_generate = None
+        self.text = None
+        model_path = 'deepseek-ai/deepseek-llm-7b-base'
+        self.base_tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.base_tokenizer.pad_token_id = self.base_tokenizer.eos_token_id
+        self.base_model = AutoModelForCausalLM.from_pretrained(model_path,
+                                                           device_map="auto",
+                                                           load_in_8bit=True)
+        byte_encoder = bytes_to_unicode()
+        self.ppl_calculator = BBPETokenizerPPLCalc(byte_encoder,
+                                                   self.base_model,
+                                                   self.base_tokenizer,
+                                                   self.device)
+
+    def forward_calc_ppl(self):
+        self.base_tokenizer.padding_side = 'right'
+        return self.ppl_calculator.forward_calc_ppl(self.text)
+
+
+class SnifferGemmaModel(SnifferBaseModel):
+    """
+    Gemma model for text detection (representing Gemini family)
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.do_generate = None
+        self.text = None
+        model_path = 'google/gemma-7b'
+        self.base_tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.base_tokenizer.pad_token_id = self.base_tokenizer.eos_token_id
+        self.base_model = AutoModelForCausalLM.from_pretrained(model_path,
+                                                           device_map="auto",
+                                                           load_in_8bit=True)
+        self.ppl_calculator = SPLlamaTokenizerPPLCalc(self.base_model,
+                                                      self.base_tokenizer,
+                                                      self.device)
+
+    def forward_calc_ppl(self):
+        self.base_tokenizer.padding_side = 'right'
+        return self.ppl_calculator.forward_calc_ppl(self.text)
+
+
+class SnifferMixtralModel(SnifferBaseModel):
+    """
+    Mixtral model for text detection
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.do_generate = None
+        self.text = None
+        model_path = 'mistralai/Mixtral-8x7B-v0.1'
+        self.base_tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.base_tokenizer.pad_token_id = self.base_tokenizer.eos_token_id
+        self.base_model = AutoModelForCausalLM.from_pretrained(model_path,
+                                                           device_map="auto",
+                                                           load_in_8bit=True)
+        self.ppl_calculator = SPLlamaTokenizerPPLCalc(self.base_model,
+                                                      self.base_tokenizer,
+                                                      self.device)
+
+    def forward_calc_ppl(self):
+        self.base_tokenizer.padding_side = 'right'
+        return self.ppl_calculator.forward_calc_ppl(self.text)
+
+
+class SnifferClaudeModel(SnifferBaseModel):
+    """
+    Claude-like model using Falcon as substitute (since Claude weights aren't public)
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.do_generate = None
+        self.text = None
+        model_path = 'tiiuae/falcon-7b'
+        self.base_tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.base_tokenizer.pad_token_id = self.base_tokenizer.eos_token_id
+        self.base_model = AutoModelForCausalLM.from_pretrained(model_path,
+                                                           device_map="auto",
+                                                           load_in_8bit=True)
+        byte_encoder = bytes_to_unicode()
+        self.ppl_calculator = BBPETokenizerPPLCalc(byte_encoder,
+                                                   self.base_model,
+                                                   self.base_tokenizer,
+                                                   self.device)
+
+    def forward_calc_ppl(self):
+        self.base_tokenizer.padding_side = 'right'
+        return self.ppl_calculator.forward_calc_ppl(self.text)

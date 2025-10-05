@@ -311,6 +311,8 @@ def split_dataset(data_path, train_path, test_path, train_ratio=0.9):
 import argparse
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--setup', type=str) # ['three_labels', 'specific_labels']
+    parser.add_argument('--dataset', type=str) # ['faid', 'hart', 'llm_detective']
     parser.add_argument('--model', type=str, default='Transformer')
     parser.add_argument('--gpu', type=str, default='0')
     parser.add_argument('--train_mode', type=str, default='classify')
@@ -320,8 +322,6 @@ def parse_args():
     parser.add_argument('--train_ratio', type=float, default=0.9)
     parser.add_argument('--split_dataset', action='store_true')
     parser.add_argument('--data_path', type=str, default='')
-    parser.add_argument('--train_path', type=str, default='')
-    parser.add_argument('--test_path', type=str, default='')
 
     parser.add_argument('--num_train_epochs', type=int, default=10)
     parser.add_argument('--weight_decay', type=float, default=0.1)
@@ -336,28 +336,76 @@ def parse_args():
 # python ./Seq_train/train.py --gpu=0
 if __name__ == "__main__":
     args = parse_args()
+    train_path = f'../input/datasets/datasets/{args.dataset}/train_data_with_features.jsonl'
+    test_path = f'../input/datasets/datasets/{args.dataset}/test_data_with_features.jsonl'
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
-    if args.split_dataset:
-        print("Log INFO: split dataset...")
-        split_dataset(data_path=args.data_path, train_path=args.train_path, test_path=args.test_path, train_ratio=args.train_ratio)
-
-    # en_labels = backend_model_info.en_labels
-    en_labels = {
-        'gpt2': 0,
-        'gptneo': 1,
-        'gptj': 2,
-        'llama': 3,
-        'gpt3re': 4,
-        # 'gpt3sum': 3,
-        'human': 5
-    }
-    # en_labels = {'AI':0, 'human':1}
+    # if args.split_dataset:
+    #     print("Log INFO: split dataset...")
+    #     split_dataset(data_path=args.data_path, train_path=train_path, test_path=test_path, train_ratio=args.train_ratio)
+    #     sys.exit(1)
+    
+    if args.setup == 'three_labels':
+        en_labels = {
+            'human': 0,
+            'deepseek': 1,
+            'gemini': 1,
+            'gpt': 1,
+            'llama': 1,
+            'llama3': 1,
+            'gemma': 1,
+            'mixtral': 1,
+            'claude': 1,
+            'human---deepseek': 2,
+            'human---gemini': 2,
+            'human---gpt': 2,
+            'human---llama': 2,
+            'human---llama3': 2,
+            'human---gemma': 2,
+            'human---mixtral': 2,
+            'human---claude': 2,
+        }
+    
+    elif args.setup == 'specific_labels':
+        if args.dataset == 'faid':
+            en_labels = {
+                'human': 0,
+                'deepseek': 1,
+                'gemini': 2,
+                'gpt': 3,
+                'llama': 4,
+                'human---deepseek': 5,
+                'human---gemini': 6,
+                'human---gpt': 7,
+                'human---llama': 8,
+            }
+        
+        elif args.dataset == 'hart':
+            en_labels = {
+                'human': 0,
+                'claude': 1,
+                'gemini': 2,
+                'gpt': 3,
+                'human---claude': 4,
+                'human---gemini': 5,
+                'human---gpt': 6,
+            }
+        
+        elif args.dataset == 'llm_detective':
+            en_labels = {
+                'human': 0,
+                'gemma': 1,
+                'llama3': 2,
+                'mixtral': 3,
+                'human---gemma': 4,
+                'human---llama3': 5,
+                'human---mixtral': 6,
+            }
 
     id2label = construct_bmes_labels(en_labels)
     label2id = {v: k for k, v in id2label.items()}
 
-    data = DataManager(train_path=args.train_path, test_path=args.test_path, batch_size=args.batch_size, max_len=args.seq_len, human_label='human', id2label=id2label)
+    data = DataManager(train_path=train_path, test_path=test_path, batch_size=args.batch_size, max_len=args.seq_len, human_label='human', id2label=id2label)
     
     """linear classify"""
     if args.train_mode == 'classify':

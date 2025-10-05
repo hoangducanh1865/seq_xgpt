@@ -10,6 +10,11 @@ from backend_model import (SnifferGPTNeoModel,
                            SnifferSkyWorkModel, 
                            SnifferDaMoModel, 
                            SnifferLlamaModel, 
+                           SnifferLlama3Model,
+                           SnifferDeepSeekModel,
+                           SnifferGemmaModel,
+                           SnifferMixtralModel,
+                           SnifferClaudeModel,
                            SnifferChatGLMModel, 
                            SnifferAlpacaModel, 
                            SnifferDollyModel,
@@ -22,6 +27,12 @@ MODEL_MAPPING_NAMES = OrderedDict([
     ("gptneo", SnifferGPTNeoModel),
     ("gptj", SnifferGPTJModel),
     ("llama", SnifferLlamaModel),
+    ("llama3", SnifferLlama3Model),
+    ("deepseek", SnifferDeepSeekModel),
+    ("gemma", SnifferGemmaModel),
+    ("gemini", SnifferGemmaModel),  # Alias for gemma
+    ("mixtral", SnifferMixtralModel),
+    ("claude", SnifferClaudeModel),
     ("wenzhong", SnifferWenZhongModel),
     ("skywork", SnifferSkyWorkModel),
     ("damo", SnifferDaMoModel),
@@ -41,7 +52,7 @@ def parse_args():
         required=True,
         default="gpt2",
         help=
-        "The model to use. You can choose one of [gpt2, gptneo, gptj, llama, wenzhong, skywork, damo, chatglm, alpaca, dolly].",
+        "The model to use. You can choose one of [gpt2, gptneo, gptj, llama, llama3, deepseek, gemma, gemini, mixtral, claude, wenzhong, skywork, damo, chatglm, alpaca, dolly].",
     )
     parser.add_argument("--gpu",
                         type=str,
@@ -56,7 +67,7 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    # --model: [damo, gpt2, gptj, gptneo, wenzhong, skywork, llama]
+    # --model: [damo, gpt2, gptj, gptneo, wenzhong, skywork, llama, llama3, deepseek, gemma, gemini, mixtral, claude]
     # python backend_api.py --port 6006 --timeout 30000 --debug --model=damo --gpu=3
     args = parse_args()
     os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
