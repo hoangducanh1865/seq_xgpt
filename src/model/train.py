@@ -336,8 +336,8 @@ def parse_args():
 # python ./Seq_train/train.py --gpu=0
 if __name__ == "__main__":
     args = parse_args()
-    train_path = f'../input/datasets/datasets/{args.dataset}/train_data_with_features.jsonl'
-    test_path = f'../input/datasets/datasets/{args.dataset}/test_data_with_features.jsonl'
+    train_path = f'data/datasets/{args.dataset}/train_data_with_features.jsonl'
+    test_path = f'data/datasets/{args.dataset}/test_data_with_features.jsonl'
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
     # if args.split_dataset:

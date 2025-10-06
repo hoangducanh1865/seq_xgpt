@@ -13,10 +13,10 @@ from sklearn.preprocessing import normalize
 from tqdm import tqdm
 
 DEEPSEEK_API = "https://pentagonally-scalelike-delaney.ngrok-free.dev/inference"
-T5_API = 'https://5e549f7cc1ee.ngrok-free.app/inference'
-GPT_API = "https://5a4e9e7645f4.ngrok-free.app/inference"
+T5_API = "https://207bbf789f92.ngrok-free.app/inference"
+GPT_API = "https://5b8624fde175.ngrok-free.app/inference"
 LLAMA3_API = ''
-LLAMA_API = "https://96978cede0c7.ngrok-free.app/inference"
+LLAMA_API = "https://3201a2e1c92a.ngrok-free.app/inference"
 MIXTRAL_API = ''
 CLAUDE_API = ''
 
@@ -298,7 +298,7 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     
-    input_file = '/kaggle/input/my-datasets/datasets/' + args.dataset + '/' + args.data_type + '.jsonl'
+    input_file = 'data/datasets/' + args.dataset + '/' + args.data_type + '.jsonl'
     output_file = 'data/datasets/' + args.dataset + '/' + args.data_type + '_with_features.jsonl'
 
     if args.get_en_features:
