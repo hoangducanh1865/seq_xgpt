@@ -109,7 +109,7 @@ def get_features(type, input_file, output_file):
 
     print('input file:{}, length:{}'.format(input_file, len(lines)))
 
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, 'a', encoding='utf-8') as f:
         for data in tqdm(lines):
             line = data['text']
             label = data['label']
@@ -123,8 +123,9 @@ def get_features(type, input_file, output_file):
                 label_dict = en_labels
             elif type == 'cn':
                 '''model_apis = cn_model_apis'''
-                label_dict = cn_labels
-
+                # label_dict = cn_labels
+                pass
+                
             label_int = label_dict[label]
 
             error_flag = False
@@ -180,7 +181,7 @@ def process_features(input_file, output_file, do_normalize=False):
     # raw_features = json.load(open(input_file, 'r', encoding='utf-8'))
     print('input file:{}, length:{}'.format(input_file, len(raw_features)))
 
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, 'a', encoding='utf-8') as f:
         for raw_feature in tqdm(raw_features):
             losses = raw_feature['losses']
             begin_idx_list = raw_feature['begin_idx_list']
