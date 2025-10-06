@@ -15,7 +15,7 @@ fi
 python src/model/train.py \
     --setup 'three_labels' \
     --dataset 'faid' \
-    --gpu=1 \
+    --gpu=0 \
     --do_test \
     --load_pretrained \
     --test_content

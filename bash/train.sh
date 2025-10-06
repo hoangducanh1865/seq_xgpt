@@ -7,7 +7,7 @@ echo "===================================="
 python src/model/train.py \
     --setup 'three_labels' \
     --dataset 'faid' \
-    --gpu=1 \
+    --gpu=0 \
     --num_train_epochs 10 \
     --batch_size 8 \
     --lr 5e-5
