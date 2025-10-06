@@ -16,7 +16,7 @@ DEEPSEEK_API = "https://pentagonally-scalelike-delaney.ngrok-free.dev/inference"
 T5_API = "https://207bbf789f92.ngrok-free.app/inference"
 GPT_API = "https://5b8624fde175.ngrok-free.app/inference"
 LLAMA3_API = ''
-LLAMA_API = "https://3201a2e1c92a.ngrok-free.app/inference"
+LLAMA_API = "https://6eb20e338c8c.ngrok-free.app/inference"
 MIXTRAL_API = ''
 CLAUDE_API = ''
 
