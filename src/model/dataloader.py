@@ -22,7 +22,7 @@ def set_seed(seed):
 
 class DataManager:
 
-    def __init__(self, train_path, test_path, batch_size, max_len, human_label, id2label, word_pad_idx=0, label_pad_idx=-1):
+    def __init__(self, train_path, test_path, batch_size, max_len, human_label, id2label, word_pad_idx=0, label_pad_idx=-1, raw_text_mode=False):
         set_seed(0)
         self.batch_size = batch_size
         self.max_len = max_len
@@ -33,6 +33,7 @@ class DataManager:
         self.label_pad_idx = label_pad_idx
         self.train_dataloader = None
         self.test_dataloader = None
+        self.raw_text_mode = raw_text_mode
 
         data = dict()
 
@@ -70,7 +71,12 @@ class DataManager:
             else:
                 samples = [json.loads(line) for line in f]
 
-        samples_dict = {'features': [], 'prompt_len': [], 'label': [], 'text': []}
+        # Handle raw text mode vs features mode
+        if self.raw_text_mode:
+            samples_dict = {'features': [], 'prompt_len': [], 'label': [], 'text': []}
+            return self.process_raw_text_samples(samples, samples_dict)
+        else:
+            samples_dict = {'features': [], 'prompt_len': [], 'label': [], 'text': []}
 
         for item in tqdm(samples):
             text = item['text']
@@ -124,6 +130,23 @@ class DataManager:
 
         return samples_dict
 
+    def process_raw_text_samples(self, samples, samples_dict):
+        """Process samples in raw text mode without tokenizer features."""
+        for item in tqdm(samples):
+            text = item['text']
+            label = item['label']
+            prompt_len = item.get('prompt_len', 0)  # Default to 0 if not present
+            
+            # For raw text mode, create dummy features (empty list or zeros)
+            # The model will need to handle this appropriately
+            dummy_features = []  # Empty features for raw text mode
+            
+            samples_dict['features'].append(dummy_features)
+            samples_dict['prompt_len'].append(prompt_len)
+            samples_dict['label'].append(label)
+            samples_dict['text'].append(text)
+        
+        return samples_dict
 
     def get_train_dataloader(self, dataset):
         return DataLoader(dataset,
@@ -147,7 +170,11 @@ class DataManager:
         text = [sample['text'] for sample in samples]
         label = [sample['label'] for sample in samples]
 
-        features, masks = self.process_and_convert_to_tensor(features)
+        if self.raw_text_mode:
+            # For raw text mode, create dummy features and masks
+            features, masks = self.create_raw_text_tensors(text, label)
+        else:
+            features, masks = self.process_and_convert_to_tensor(features)
         # pad_masks = ~masks * -1
         pad_masks = (1 - masks) * self.label_pad_idx
 
@@ -210,6 +237,25 @@ class DataManager:
 
         return tensor_data, tensor_mask
 
+    def create_raw_text_tensors(self, texts, labels):
+        """Create dummy tensors for raw text mode."""
+        max_len = self.max_len
+        batch_size = len(texts)
+        
+        # Create dummy features (zeros) - assuming some default feature dimension
+        # The model should be modified to handle this appropriately
+        feat_dim = 4  # Default feature dimension, adjust as needed
+        tensor_data = torch.zeros(batch_size, max_len, feat_dim, dtype=torch.float)
+        
+        # Create masks based on text length
+        masks = []
+        for text in texts:
+            text_len = min(len(self.split_sentence(text)), max_len)
+            mask = [1] * text_len + [0] * (max_len - text_len)
+            masks.append(mask)
+        
+        tensor_mask = torch.tensor(masks, dtype=torch.long)
+        return tensor_data, tensor_mask
 
     def _split_en_sentence(self, sentence, use_sp=False):
         import re
