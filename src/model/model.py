@@ -146,11 +146,19 @@ class ModelWiseTransformerClassifier(nn.Module):
         padding_mask = ~mask
 
         x = x.transpose(1, 2)
-        out1 = self.conv_feat_extract(x[:, 0:1, :])  
-        out2 = self.conv_feat_extract(x[:, 1:2, :])  
-        out3 = self.conv_feat_extract(x[:, 2:3, :])  
-        out4 = self.conv_feat_extract(x[:, 3:4, :])  
-        out = torch.cat((out1, out2, out3, out4), dim=2)  
+        # Handle variable number of channels
+        num_channels = x.shape[1]
+        channel_outputs = []
+        for i in range(num_channels):
+            channel_out = self.conv_feat_extract(x[:, i:i+1, :])
+            channel_outputs.append(channel_out)
+        
+        # If we have fewer than 4 channels, pad with zeros
+        while len(channel_outputs) < 4:
+            zero_output = torch.zeros_like(channel_outputs[0])
+            channel_outputs.append(zero_output)
+        
+        out = torch.cat(channel_outputs[:4], dim=2)  
         
         outputs = out + self.position_encoding.to(out.device)
         outputs = self.norm(outputs)

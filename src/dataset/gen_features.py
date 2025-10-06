@@ -13,10 +13,10 @@ from sklearn.preprocessing import normalize
 from tqdm import tqdm
 
 DEEPSEEK_API = "https://pentagonally-scalelike-delaney.ngrok-free.dev/inference"
-T5_API = "https://70058c025c51.ngrok-free.app/inference"
-GPT_API = "https://5bf7c774bade.ngrok-free.app/inference"
+T5_API = "https://9c9347c43150.ngrok-free.app/inference"
+GPT_API = "https://a39dc2878b39.ngrok-free.app/inference"
 LLAMA3_API = ''
-LLAMA_API = "https://52baeab2651b.ngrok-free.app/inference"
+LLAMA_API = "https://96053fdcb3a5.ngrok-free.app/inference"
 MIXTRAL_API = ''
 CLAUDE_API = ''
 
@@ -132,7 +132,7 @@ def get_features(type, input_file, output_file):
             for api in model_apis:
                 try:
                     loss, begin_word_idx, ll_tokens = access_api(line, api)
-                    print(f"OK: {api}")
+                    print(f"OK", end=' ')
                 except TypeError:
                     print("return NoneType, probably gpu OOM, discard this sample")
                     print(api)
@@ -141,6 +141,7 @@ def get_features(type, input_file, output_file):
                 losses.append(loss)
                 begin_idx_list.append(begin_word_idx)
                 ll_tokens_list.append(ll_tokens)
+            print('')
             # if oom, discard this sample
             if error_flag:
                 continue

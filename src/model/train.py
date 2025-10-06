@@ -347,65 +347,57 @@ if __name__ == "__main__":
     
     if args.setup == 'three_labels':
         en_labels = {
-            'human': 0,
-            'deepseek': 1,
-            'gemini': 1,
-            'gpt': 1,
-            'llama': 1,
-            'llama3': 1,
-            'gemma': 1,
-            'mixtral': 1,
-            'claude': 1,
-            'human---deepseek': 2,
-            'human---gemini': 2,
-            'human---gpt': 2,
-            'human---llama': 2,
-            'human---llama3': 2,
-            'human---gemma': 2,
-            'human---mixtral': 2,
-            'human---claude': 2,
+            'human-text': 0,
+            'deepseek-text': 1,
+            'gemini-text': 1,
+            'gpt-text': 1,
+            'llama-text': 1,
+            'human---deepseek-text': 2,
+            'human---gemini-text': 2,
+            'human---gpt-text': 2,
+            'human---llama-text': 2
         }
     
     elif args.setup == 'specific_labels':
         if args.dataset == 'faid':
             en_labels = {
-                'human': 0,
-                'deepseek': 1,
-                'gemini': 2,
-                'gpt': 3,
-                'llama': 4,
-                'human---deepseek': 5,
-                'human---gemini': 6,
-                'human---gpt': 7,
-                'human---llama': 8,
+                'human-text': 0,
+                'deepseek-text': 1,
+                'gemini-text': 2,
+                'gpt-text': 3,
+                'llama-text': 4,
+                'human---deepseek-text': 5,
+                'human---gemini-text': 6,
+                'human---gpt-text': 7,
+                'human---llama-text': 8,
             }
         
         elif args.dataset == 'hart':
             en_labels = {
-                'human': 0,
-                'claude': 1,
-                'gemini': 2,
-                'gpt': 3,
-                'human---claude': 4,
-                'human---gemini': 5,
-                'human---gpt': 6,
+                'human-text': 0,
+                'claude-text': 1,
+                'gemini-text': 2,
+                'gpt-text': 3,
+                'human---claude-text': 4,
+                'human---gemini-text': 5,
+                'human---gpt-text': 6,
             }
         
         elif args.dataset == 'llm_detective':
             en_labels = {
-                'human': 0,
-                'gemma': 1,
-                'llama3': 2,
-                'mixtral': 3,
-                'human---gemma': 4,
-                'human---llama3': 5,
-                'human---mixtral': 6,
+                'human-text': 0,
+                'gemma-text': 1,
+                'llama3-text': 2,
+                'mixtral-text': 3,
+                'human---gemma-text': 4,
+                'human---llama3-text': 5,
+                'human---mixtral-text': 6,
             }
 
     id2label = construct_bmes_labels(en_labels)
     label2id = {v: k for k, v in id2label.items()}
 
-    data = DataManager(train_path=train_path, test_path=test_path, batch_size=args.batch_size, max_len=args.seq_len, human_label='human', id2label=id2label)
+    data = DataManager(train_path=train_path, test_path=test_path, batch_size=args.batch_size, max_len=args.seq_len, human_label='human-text', id2label=id2label)
     
     """linear classify"""
     if args.train_mode == 'classify':

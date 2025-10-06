@@ -89,6 +89,13 @@ class DataManager:
             begin_idx_list = item['begin_idx_list']
             ll_tokens_list = item['ll_tokens_list']
 
+            # Filter out empty token lists before processing
+            ll_tokens_list = [tokens for tokens in ll_tokens_list if len(tokens) > 0]
+            
+            # Skip if no valid token lists remain
+            if len(ll_tokens_list) == 0:
+                continue
+
             begin_idx_list = np.array(begin_idx_list)
             # Get the maximum value in begin_idx_list, which indicates where we need to truncate.
             max_begin_idx = np.max(begin_idx_list)
