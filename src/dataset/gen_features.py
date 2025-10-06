@@ -15,8 +15,8 @@ from tqdm import tqdm
 DEEPSEEK_API = "https://pentagonally-scalelike-delaney.ngrok-free.dev/inference"
 T5_API = "https://207bbf789f92.ngrok-free.app/inference"
 GPT_API = "https://5b8624fde175.ngrok-free.app/inference"
-LLAMA3_API = ''
-LLAMA_API = "https://6eb20e338c8c.ngrok-free.app/inference"
+LLAMA3_API = "https://6eb20e338c8c.ngrok-free.appinference"
+LLAMA_API = "https://6eb20e338c8c.ngrok-free.appinference"
 MIXTRAL_API = ''
 CLAUDE_API = ''
 
@@ -84,22 +84,21 @@ def get_features(type, input_file, output_file):
     deepseek_api = DEEPSEEK_API 
     t5_api = T5_API
     gpt_j_api = GPT_API 
-    # llama3_api = LLAMA3_API
+    claude_api = CLAUDE_API
+    llama3_api = LLAMA3_API
     llama_api = LLAMA_API
 
-    en_model_apis = [deepseek_api, t5_api, gpt_j_api, llama_api]
+    en_model_apis = [claude_api, t5_api, gpt_j_api]
 
     en_labels = {
         'human-text': 0,
-        'deepseek-text': 1,
+        'claude-text': 1,
         'gemini-text': 2,
         'gpt-text': 3,
-        'llama-text': 4,
         # Mixed human-AI labels
-        'human---deepseek-text': 5,
-        'human---gemini-text': 6,
-        'human---gpt-text': 7,
-        'human---llama-text': 8,
+        'human---claude-text': 4,
+        'human---gemini-text': 5,
+        'human---gpt-text': 6
     }
 
     # line = {'text': '', 'label': ''}
@@ -109,7 +108,7 @@ def get_features(type, input_file, output_file):
 
     print('input file:{}, length:{}'.format(input_file, len(lines)))
 
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, 'a', encoding='utf-8') as f:
         for data in tqdm(lines):
             line = data['text']
             label = data['label']
@@ -123,7 +122,8 @@ def get_features(type, input_file, output_file):
                 label_dict = en_labels
             elif type == 'cn':
                 '''model_apis = cn_model_apis'''
-                label_dict = cn_labels
+                # label_dict = cn_labels
+                pass
 
             label_int = label_dict[label]
 
@@ -180,7 +180,7 @@ def process_features(input_file, output_file, do_normalize=False):
     # raw_features = json.load(open(input_file, 'r', encoding='utf-8'))
     print('input file:{}, length:{}'.format(input_file, len(raw_features)))
 
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, 'a', encoding='utf-8') as f:
         for raw_feature in tqdm(raw_features):
             losses = raw_feature['losses']
             begin_idx_list = raw_feature['begin_idx_list']
