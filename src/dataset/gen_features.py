@@ -9,7 +9,16 @@ import json
 import scipy
 import numpy as np
 from sklearn.preprocessing import normalize
+# from src.config.config import Config as config
 from tqdm import tqdm
+
+DEEPSEEK_API = "https://pentagonally-scalelike-delaney.ngrok-free.dev/inference"
+T5_API = 'https://5e549f7cc1ee.ngrok-free.app/inference'
+GPT_API = "https://5a4e9e7645f4.ngrok-free.app/inference"
+LLAMA3_API = ''
+LLAMA_API = "https://96978cede0c7.ngrok-free.app/inference"
+MIXTRAL_API = ''
+CLAUDE_API = ''
 
 
 '''
@@ -70,34 +79,27 @@ def get_features(type, input_file, output_file):
     get [losses, begin_idx_list, ll_tokens_list, label_int, label] based on raw lines
     """
 
-    en_model_names = ['deepseek', 't5', 'gpt_j', 'llama3', 'llama', 'mixtral', 'claude']
+    en_model_names = ['deepseek', 't5', 'gpt_j', 'llama']
     
-    deepseek_api = 'https://7767b376a5d9.ngrok-free.app/inference' 
-    t5_api = 'https://0c67a2f270aa.ngrok-free.app/inference'  
-    gpt_j_api = 'https://ae47889762c5.ngrok-free.app/inference'  
-    llama3_api = 'https://0ffb9c13b1d7.ngrok-free.app/inference'
-    llama_api = 'https://0ffb9c13b1d7.ngrok-free.app/inference'
-    mixtral_api = 'https://0ffb9c13b1d7.ngrok-free.app/inference'
-    claude_api = 'https://0ffb9c13b1d7.ngrok-free.app/inference'
+    deepseek_api = DEEPSEEK_API 
+    t5_api = T5_API
+    gpt_j_api = GPT_API 
+    # llama3_api = LLAMA3_API
+    llama_api = LLAMA_API
 
-    en_model_apis = [deepseek_api, t5_api, gpt_j_api, llama3_api, llama_api, mixtral_api, claude_api]
+    en_model_apis = [deepseek_api, t5_api, gpt_j_api, llama_api]
 
     en_labels = {
-        'human': 0,
-        'deepseek': 1,
-        'gemini': 2,
-        'gpt': 3,
-        'llama3': 4,
-        'llama': 5,
-        'mixtral': 6,
-        'claude': 7,
-        'human---deepseek': 8,
-        'human---gemini': 9,
-        'human---gpt': 10,
-        'human---llama3': 11,
-        'human---llama': 12,
-        'human---mixtral': 13,
-        'human---claude': 14,
+        'human-text': 0,
+        'deepseek-text': 1,
+        'gemini-text': 2,
+        'gpt-text': 3,
+        'llama-text': 4,
+        # Mixed human-AI labels
+        'human---deepseek-text': 5,
+        'human---gemini-text': 6,
+        'human---gpt-text': 7,
+        'human---llama-text': 8,
     }
 
     # line = {'text': '', 'label': ''}
@@ -129,8 +131,10 @@ def get_features(type, input_file, output_file):
             for api in model_apis:
                 try:
                     loss, begin_word_idx, ll_tokens = access_api(line, api)
+                    print(f"OK: {api}")
                 except TypeError:
                     print("return NoneType, probably gpu OOM, discard this sample")
+                    print(api)
                     error_flag = True
                     break
                 losses.append(loss)
@@ -294,35 +298,16 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     
-    input_file = 'data/datasets/' + args.dataset + '/' + args.data_type + '.jsonl'
+    input_file = '/kaggle/input/my-datasets/datasets/' + args.dataset + '/' + args.data_type + '.jsonl'
     output_file = 'data/datasets/' + args.dataset + '/' + args.data_type + '_with_features.jsonl'
 
     if args.get_en_features:
-        """
-        retrieve english features in a single file 
-        python gen_features.py --get_en_features --input_file raw_data/en_alpaca_lines.jsonl --output_file ../features/raw_features/en_alpaca_features.jsonl
-        python gen_features.py --get_en_features --input_file raw_data/en_dolly_lines.jsonl --output_file ../features/raw_features/en_dolly_features.jsonl
-        
-        python gen_features.py --get_en_features --input_file gpt3_ablation_data/gpt3_ablation_train_lines.jsonl --output_file ../features/gpt3_ablation_features/gpt3_ablation_train_features.jsonl
-        python gen_features.py --get_en_features --input_file gpt3_ablation_data/gpt3_ablation_test_lines.jsonl --output_file ../features/gpt3_ablation_features/gpt3_ablation_test_features.jsonl
-        """
         get_features(type='en', input_file=input_file, output_file=output_file)
 
     elif args.get_cn_features:
-        """
-        retrieve chinese features in a single file 
-        python gen_features.py --get_cn_features --input_file aligned_data/cn_wenzhong_aligned_lines.jsonl --output_file ../features/aligned_features/cn_wenzhong_aligned_features.jsonl
-
-        python gen_features.py --get_cn_features --input_file aligned_data/cn_moss_aligned_lines.jsonl --output_file ../features/aligned_features/cn_moss_aligned_features.jsonl
-        """
         get_features(type='cn', input_file=input_file, output_file=output_file)
 
     elif args.get_en_features_multithreading:
-        """
-        retrieve english features in multiple files, use multithreading for faster speed
-        python gen_features.py --get_en_features_multithreading
-        """
-
         en_input_files = ['supervised_learning/raw_data/en_gpt2_lines_all.jsonl',
                     'supervised_learning/raw_data/en_gptj_lines_all.jsonl',
                     'supervised_learning/raw_data/en_gptneo_lines_all.jsonl',
@@ -344,10 +329,6 @@ if __name__ == "__main__":
             t.join()
 
     elif args.get_cn_features_multithreading:
-        """
-        retrieve chinese features in multiple files, use multithreading for faster speed
-        python gen_features.py --get_cn_features_multithreading
-        """
         cn_input_files = ['raw_data/cn_human_lines.jsonl',
                           'raw_data/cn_gpt3re_lines.jsonl',
                           'raw_data/cn_gpt3sum_lines.jsonl',
@@ -375,22 +356,6 @@ if __name__ == "__main__":
                            '../features/aligned_features/cn_chatglm_aligned_features.jsonl',
                            '../features/aligned_features/cn_wenzhong_aligned_features.jsonl',
                            '../features/aligned_features/cn_damo_aligned_features.jsonl',
-                           '../features/aligned_features/cn_sky_text_aligned_features.jsonl']
-        threads = []
-        for i in range(len(cn_input_files)):
-            t = threading.Thread(target=get_features, args=('cn', cn_input_files[i], cn_output_files[i]))
-            threads.append(t)
-            t.start()
-        for t in threads:
-            t.join()
-
-    elif args.process_features:
-        
-        print(args.do_normalize)
-        process_features(input_file, output_file, args.do_normalize)
-
-    else:
-        print("please select an action")
                            '../features/aligned_features/cn_sky_text_aligned_features.jsonl']
         threads = []
         for i in range(len(cn_input_files)):
